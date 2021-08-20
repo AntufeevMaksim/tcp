@@ -2,16 +2,17 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
-
-
+#include <iostream>
+#include <string>
 
 
 int main(){
   struct sockaddr_in local;
   int s;
   int s1;
+  int s2;
   int rc;
-  char buf [1];
+  char buf [10];
 
   local.sin_family = AF_INET;
   local.sin_port = htons(8888);
@@ -23,6 +24,7 @@ int main(){
     return 1;
   }
   int opt = 1;
+
   if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt)) == -1)
     perror("setsockopt");
 
@@ -44,18 +46,36 @@ int main(){
     return 1;
   }
 
-  rc = recv(s1, buf, 1, 0);
-  if (rc <= 0){
-    perror("error recv");
-    return 1;
-  } 
+  // s2 = accept(s, NULL, NULL);
+  // if (s1 < 0){
+  //   perror("accept error");
+  //   return 1;
+  // }  
 
-  printf("%c\n", buf[0]);
-  rc = send(s1, "21", 2, 0);
-  if (rc <= 0){
-    perror("error send");
-    return 1;
-  }   
+  // send(s2, "client 2", 10, 0);
+
+  while (true){
+    rc = recv(s1, buf, 10, 0);
+    if (rc <= 0){
+      perror("error recv");
+      return 1;
+    } 
+    else{
+      for (char c : buf){
+      printf("%c", c);
+      }
+      printf("\n");
+    }
+    std::string input;
+    std::cin >> input;
+    rc = send(s1, input.c_str(), 10, 0);
+    if (rc <= 0){
+      perror("error send");
+      return 1;
+    }   
+
+
+  }
   shutdown(s, SHUT_RDWR);
   return 0;
 
