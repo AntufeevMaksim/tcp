@@ -4,15 +4,34 @@
 #include <stdio.h>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <chrono>
+#include <poll.h>
+
+char Read(int s, fd_set readfs, timeval tv){
+  char buf;
+
+  int res = select(s+1, &readfs, NULL, NULL, &tv);
+  if (res>0){
+    int rc = recv(s, &buf, 1, 0);
+    return buf;
+  }
+  else{
+    return -1;
+  }
+}
+
+
 
 
 int main(){
+  using namespace std::chrono_literals;
   struct sockaddr_in local;
   int s;
   int s1;
   int s2;
   int rc;
-  char buf [10];
+  char buf;
 
   local.sin_family = AF_INET;
   local.sin_port = htons(8888);
@@ -27,6 +46,7 @@ int main(){
 
   if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof (opt)) == -1)
     perror("setsockopt");
+
 
   rc = bind(s, (struct sockaddr*)&local, sizeof(local));
   if (rc<0){
@@ -45,37 +65,59 @@ int main(){
     perror("accept error");
     return 1;
   }
-
-  // s2 = accept(s, NULL, NULL);
-  // if (s1 < 0){
-  //   perror("accept error");
-  //   return 1;
-  // }  
+  
+  s2 = accept(s, NULL, NULL);
+  if (s1 < 0){
+    perror("accept error");
+    return 1;
+  }  
 
   // send(s2, "client 2", 10, 0);
+  // char* a = "3";
+  // printf(a);
+  // rc = send(s1, "Y", 1, 0);
+  struct timeval tv;
+  fd_set readfs1;
+  tv.tv_sec = 1;
+  tv.tv_usec = 5000;
+  FD_ZERO(&readfs1);
+  FD_SET(s1, &readfs1);
+
+  fd_set readfs2;
+  FD_ZERO(&readfs2);
+  FD_SET(s2, &readfs2);
+
 
   while (true){
-    rc = recv(s1, buf, 10, 0);
-    if (rc <= 0){
-      perror("error recv");
-      return 1;
-    } 
-    else{
-      for (char c : buf){
-      printf("%c", c);
-      }
-      printf("\n");
+    // rc = recv(s1, buf, 1, 0);
+    // if (rc <= 0){
+    //   perror("error recv");
+    //   return 1;
+    // } 
+
+    std::this_thread::sleep_for(10ms);
+
+    buf = Read(s1, readfs1, tv);
+
+    if (buf!=-1){
+      rc = send(s2, &buf, 1, 0);
+      if (rc <= 0){
+        perror("error send");
+        return 1;
+      }   
     }
-    std::string input;
-    std::cin >> input;
-    rc = send(s1, input.c_str(), 10, 0);
-    if (rc <= 0){
-      perror("error send");
-      return 1;
-    }   
 
 
+    buf = Read(s2, readfs2, tv);
+    if (buf!=-1){
+      rc = send(s1, &buf, 1, 0);
+      if (rc <= 0){
+        perror("error send");
+        return 1;
+      }
+    }
   }
+
   shutdown(s, SHUT_RDWR);
   return 0;
 
