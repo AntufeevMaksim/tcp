@@ -7,17 +7,22 @@
 #include <thread>
 #include <chrono>
 #include <poll.h>
+#include <sys/ioctl.h>
+#include <vector>
 
-char Read(int s, fd_set readfs, timeval tv){
-  char buf;
+std::vector<char> Read(int s, fd_set readfs, timeval tv){
+  std::vector<char> buf(10);
+  int n;
+  unsigned int m;
 
   int res = select(s+1, &readfs, NULL, NULL, &tv);
   if (res>0){
-    int rc = recv(s, &buf, 1, 0);
-    return buf;
+    ioctl(s, TIOCINQ, &n);
+    int rc = recv(s, buf.data(), n, 0);
+    return (rc == 0 ? std::vector<char>{} : buf);
   }
   else{
-    return -1;
+    return {};
   }
 }
 
@@ -31,7 +36,7 @@ int main(){
   int s1;
   int s2;
   int rc;
-  char buf;
+//  char buf;
 
   local.sin_family = AF_INET;
   local.sin_port = htons(8888);
@@ -97,25 +102,26 @@ int main(){
 
     std::this_thread::sleep_for(10ms);
 
-    buf = Read(s1, readfs1, tv);
-
-    if (buf!=-1){
-      rc = send(s2, &buf, 1, 0);
+    auto buf = Read(s1, readfs1, tv);
+    if (!buf.empty()){
+      rc = send(s2, buf.data(), buf.size(), 0);
+      buf.clear();
       if (rc <= 0){
         perror("error send");
         return 1;
       }   
-    }
+    }    
 
 
     buf = Read(s2, readfs2, tv);
-    if (buf!=-1){
-      rc = send(s1, &buf, 1, 0);
+    if (!buf.empty()){
+      rc = send(s1, buf.data(), buf.size(), 0);
+      buf.clear();
       if (rc <= 0){
         perror("error send");
         return 1;
-      }
-    }
+      }   
+    }  
   }
 
   shutdown(s, SHUT_RDWR);
